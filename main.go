@@ -93,11 +93,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		embed := &discordgo.MessageEmbed{
 			Author: &discordgo.MessageEmbedAuthor{},
 			Color:  0x5f119e,
-			Title:  "🐒Získal/a jsi banány!🐒",
+			Title:  m.Author.Username,
 			Fields: []*discordgo.MessageEmbedField{
 				{
 					Name:   "Dostal/a jsi: " + strconv.Itoa(int(banans)) + " 🍌",
-					Value:  "Miluju banány. A taky opice. ",
+					Value:  "🐒Získal/a jsi banány!🐒",
 					Inline: false,
 				},
 			},
@@ -107,6 +107,51 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 
+	}
+	if strings.ToLower(m.Content) == "plantaz" {
+		user := GetUserData(dbClient, m.Author.ID)
+
+		embed := &discordgo.MessageEmbed{
+			Author: &discordgo.MessageEmbedAuthor{},
+			Color:  0x5f119e,
+			Title:  m.Author.Username,
+			Fields: []*discordgo.MessageEmbedField{
+				{
+					Name:   "Vlastníš: " + strconv.Itoa(int(user["bananas"].(int32))) + " 🍌",
+					Value:  "Miluju opice. 🐒 A taky banány!",
+					Inline: false,
+				},
+			},
+			Footer: &discordgo.MessageEmbedFooter{
+				Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
+			},
+		}
+		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	}
+	if strings.ToLower(m.Content) == "b top" {
+		topUsers := GetTopUsers(dbClient)
+
+		var fields []*discordgo.MessageEmbedField
+		//decodes the monkeys
+		for i, monke := range topUsers {
+			field := discordgo.MessageEmbedField{
+				Name:   strconv.Itoa(i+1) + ". " + monke["userName"].(string),
+				Value:  "Banánů: " + strconv.Itoa(int(monke["bananas"].(int32))),
+				Inline: false,
+			}
+			fields = append(fields, &field)
+		}
+		embed := &discordgo.MessageEmbed{
+			Author: &discordgo.MessageEmbedAuthor{},
+			Color:  0xfcba03, // Green
+			Title:  "🐒** Nejlepší opičáci: **🐒",
+			Fields: fields,
+			Footer: &discordgo.MessageEmbedFooter{
+				Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
+			},
+		}
+
+		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	}
 
 }
@@ -139,11 +184,35 @@ func GetUserData(client mongo.Client, userId string) bson.M {
 	}
 	return opicak
 }
+
+func GetTopUsers(client mongo.Client) []bson.M {
+	collection := client.Database("farmsDb").Collection("userFarm")
+	findOptions := options.Find()
+	// Sort by `price` field descending
+	findOptions.SetSort(bson.D{{"bananas", -1}})
+	findOptions.SetLimit(10)
+	//Does the query
+	documents, err := collection.Find(context.TODO(), bson.D{}, findOptions)
+	if err != nil {
+		log.Print(err)
+	}
+	//decodes the querry
+	var monkeys []bson.M
+	if err = documents.All(context.TODO(), &monkeys); err != nil {
+		log.Print(err)
+	}
+
+	if err != nil {
+		log.Print(err)
+	}
+	return (monkeys)
+}
+
 func addBanans(client mongo.Client, userId string, banans int) {
 	collection := client.Database("farmsDb").Collection("userFarm")
 	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
 		bson.D{
-			{"$inc", bson.D{{"bananas", 1}}},
+			{"$inc", bson.D{{"bananas", banans}}},
 		},
 	)
 	if err != nil {
