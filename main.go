@@ -5,18 +5,19 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"os/signal"
-	"time"
-
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	//"time"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/go-co-op/gocron"
 	"go.mongodb.org/mongo-driver/bson"
 
 	//"go.mongodb.org/mongo-driver/bson/primitive"
@@ -31,8 +32,10 @@ func init() {
 
 var token string = "OTg0NzczMDE0NTAxNjE3Njg0.GNEQyQ.5ekJcE4BKChZdGsJ6GyOC7wJsnyBa1B_zRrvcM"
 var dbClient mongo.Client = mongo.Client{}
+var scheduler gocron.Scheduler = gocron.Scheduler{}
 
 func main() {
+	scheduler = *gocron.NewScheduler(time.UTC)
 
 	//Init banana database
 	dbClient = *initDatabase()
@@ -83,9 +86,11 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the autenticated bot has access to.
 func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-
+	if m.Author.Bot {
+		return
+	}
 	if strings.ToLower(m.Content) == "b" {
-		_ = GetUserData(dbClient, m.Author.ID)
+		_ = GetUserData(dbClient, m.Author.Username, m.Author.ID)
 		banans := rand.Intn(16)
 
 		addBanans(dbClient, m.Author.ID, banans)
@@ -109,7 +114,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	}
 	if strings.ToLower(m.Content) == "plantaz" {
-		user := GetUserData(dbClient, m.Author.ID)
+		user := GetUserData(dbClient, m.Author.Username, m.Author.ID)
 
 		embed := &discordgo.MessageEmbed{
 			Author: &discordgo.MessageEmbedAuthor{},
@@ -127,6 +132,97 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 			},
 		}
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	}
+	if strings.ToLower(m.Content) == "b money" {
+		user := GetUserData(dbClient, m.Author.Username, m.Author.ID)
+		money := 0
+		if user["money"] != nil {
+			money = int(user["money"].(int32))
+		} else {
+			addMoney(dbClient, m.Author.ID, 0)
+		}
+
+		embed := &discordgo.MessageEmbed{
+			Author: &discordgo.MessageEmbedAuthor{},
+			Color:  0x5f119e,
+			Title:  m.Author.Username,
+			Fields: []*discordgo.MessageEmbedField{
+				{
+					Name:   "Vlastníš: " + strconv.Itoa(money) + " Opicich dolaru",
+					Value:  "Miluju opice. 🐒 A taky banány!",
+					Inline: false,
+				},
+			},
+			Footer: &discordgo.MessageEmbedFooter{
+				Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
+			},
+		}
+		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	}
+	if strings.ToLower(m.Content) == "b sell" {
+		user := GetUserData(dbClient, m.Author.Username, m.Author.ID)
+		bananas := int(user["bananas"].(int32))
+		money := math.Round(float64(bananas / 5))
+		resetBananas(dbClient, m.Author.ID, bananas)
+		addMoney(dbClient, m.Author.ID, int(money))
+		embed := &discordgo.MessageEmbed{
+			Author: &discordgo.MessageEmbedAuthor{},
+			Color:  0x5f119e,
+			Title:  m.Author.Username,
+			Fields: []*discordgo.MessageEmbedField{
+				{
+					Name:   "Prodal/a/o jsi : " + strconv.Itoa(bananas) + "🍌 za " + strconv.Itoa(int(money)) + " Opicich dolaru",
+					Value:  "Miluju opice. 🐒 A taky banány!",
+					Inline: false,
+				},
+			},
+			Footer: &discordgo.MessageEmbedFooter{
+				Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
+			},
+		}
+		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+	}
+	if strings.ToLower(m.Content) == "b hovno" {
+		user := GetUserData(dbClient, m.Author.Username, m.Author.ID)
+		if user["money"] == nil {
+			addMoney(dbClient, m.Author.ID, 0)
+
+		}
+		money := int(user["money"].(int32))
+		if money > 100 {
+			addHovno(dbClient, m.Author.ID)
+			addMoney(dbClient, m.Author.ID, -100)
+			embed := &discordgo.MessageEmbed{
+				Author: &discordgo.MessageEmbedAuthor{},
+				Color:  0x5f119e,
+				Title:  m.Author.Username,
+				Fields: []*discordgo.MessageEmbedField{
+					{
+						Name:   "Koupil/a/o jsi 1 opici hovno za 100 Opicich dolaru. Pouzij jej prikazem 'hovno @User'",
+						Value:  "Miluju opice. 🐒 A taky banány!",
+						Inline: false,
+					},
+				},
+				Footer: &discordgo.MessageEmbedFooter{
+					Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
+				},
+			}
+			s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		} else {
+			s.ChannelMessageSendReply(m.ChannelID, "Potrebujes aspon 100 opicich dolaru pro koupi opiciho hovna", m.Reference())
+		}
+	}
+	if strings.Contains(strings.ToLower(m.Content), "hovno") {
+		if len(m.Mentions) == 1 {
+			s.ChannelMessageSendReply(m.ChannelID, "Hodil/a/o jsi opici hovno po <@"+m.Mentions[0].ID+">", m.Reference())
+
+			scheduler.Every(5).Seconds().Do(func() {
+				s.ChannelMessageSend(m.ChannelID, "<@"+m.Mentions[0].ID+"> byl/a/o jsi proklet opicim prokletim. Hod hovno po nekom dalsim aby jsi se ho zbavil")
+			},
+			)
+			scheduler.StartAsync()
+
+		}
 	}
 	if strings.ToLower(m.Content) == "b top" {
 		topUsers := GetTopUsers(dbClient)
@@ -153,6 +249,9 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	}
+	if strings.ToLower(m.Content) == "opice hovno" {
+		s.ChannelMessageSendReply(m.ChannelID, "ZIJU TI VE ZDECH ZIJU TI VE ZDECH", m.Reference())
+	}
 
 }
 func initDatabase() *mongo.Client {
@@ -170,15 +269,17 @@ func initDatabase() *mongo.Client {
 
 	return client
 }
-func GetUserData(client mongo.Client, userId string) bson.M {
+func GetUserData(client mongo.Client, userName, userId string) bson.M {
 	collection := client.Database("farmsDb").Collection("userFarm")
 	var opicak bson.M
-	if err := collection.FindOne(context.TODO(), bson.M{"userId": userId}).Decode(&opicak); err != nil {
-		log.Print(err)
+	err := collection.FindOne(context.TODO(), bson.M{"userId": userId}).Decode(&opicak)
+	if err == nil {
 	} else {
-		collection := client.Database("serversDb").Collection("servers")
-		_, err := collection.InsertOne(context.TODO(), bson.D{{"userId", userId}, {"bananas", 0}, {"xp", 0}})
+		log.Print(err)
+		collection := client.Database("farmsDb").Collection("userFarm")
+		_, err := collection.InsertOne(context.TODO(), bson.D{{"userId", userId}, {"userName", userName}, {"bananas", 0}, {"xp", 0}})
 		if err != nil {
+			log.Print(err)
 
 		}
 	}
@@ -212,7 +313,51 @@ func addBanans(client mongo.Client, userId string, banans int) {
 	collection := client.Database("farmsDb").Collection("userFarm")
 	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
 		bson.D{
-			{"$inc", bson.D{{"bananas", banans}}},
+			{Key: "$inc", Value: bson.D{{Key: "bananas", Value: banans}}},
+		},
+	)
+	if err != nil {
+		log.Print(err)
+	}
+}
+func addHovno(client mongo.Client, userId string) {
+	collection := client.Database("farmsDb").Collection("userFarm")
+	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
+		bson.D{
+			{Key: "$inc", Value: bson.D{{Key: "hovna", Value: 1}}},
+		},
+	)
+	if err != nil {
+		log.Print(err)
+	}
+}
+func addMoney(client mongo.Client, userId string, money int) {
+	collection := client.Database("farmsDb").Collection("userFarm")
+	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
+		bson.D{
+			{Key: "$inc", Value: bson.D{{Key: "money", Value: money}}},
+		},
+	)
+	if err != nil {
+		log.Print(err)
+	}
+}
+func resetBananas(client mongo.Client, userId string, bananas int) {
+	collection := client.Database("farmsDb").Collection("userFarm")
+	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
+		bson.D{
+			{Key: "$inc", Value: bson.D{{Key: "bananas", Value: -bananas}}},
+		},
+	)
+	if err != nil {
+		log.Print(err)
+	}
+}
+func addField(client mongo.Client, userId, fieldName string, value int) {
+	collection := client.Database("farmsDb").Collection("userFarm")
+	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
+		bson.D{
+			{Key: fieldName, Value: value},
 		},
 	)
 	if err != nil {
