@@ -30,7 +30,7 @@ func init() {
 	flag.Parse()
 }
 
-var token string = "OTg0NzczMDE0NTAxNjE3Njg0.GNEQyQ.5ekJcE4BKChZdGsJ6GyOC7wJsnyBa1B_zRrvcM"
+var token = os.Getenv("DISCORD_TOKEN")
 var dbClient mongo.Client = mongo.Client{}
 var scheduler gocron.Scheduler = gocron.Scheduler{}
 
