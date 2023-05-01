@@ -213,10 +213,32 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 	}
 	if strings.Contains(strings.ToLower(m.Content), "hovno") {
+
 		if len(m.Mentions) == 1 {
+
+			res := subHovno(dbClient, m.Author.Username, m.Author.ID)
+			if !res {
+				s.ChannelMessageSendReply(m.ChannelID, "Nemas dost hoven :// kup nejake pres b hovno", m.Reference())
+				return
+			}
+			scheduler.Clear()
+
+			if m.Mentions[0].ID == "m.Mentions[0].ID" {
+				s.ChannelMessageSend(m.ChannelID, "⚠️⚠️⚠️⚠️")
+				s.ChannelMessageSend(m.ChannelID, "Za trest budes ohovnen")
+
+				scheduler.Every(10).Seconds().Do(func() {
+					s.ChannelMessageSend(m.ChannelID, "<@"+m.Author.ID+"> byl/a/o jsi proklet opicim prokletim. Hod hovno po nekom dalsim aby jsi se ho zbavil")
+				},
+				)
+				scheduler.StartAsync()
+
+				return
+			}
+
 			s.ChannelMessageSendReply(m.ChannelID, "Hodil/a/o jsi opici hovno po <@"+m.Mentions[0].ID+">", m.Reference())
 
-			scheduler.Every(5).Seconds().Do(func() {
+			scheduler.Every(2).Minutes().Do(func() {
 				s.ChannelMessageSend(m.ChannelID, "<@"+m.Mentions[0].ID+"> byl/a/o jsi proklet opicim prokletim. Hod hovno po nekom dalsim aby jsi se ho zbavil")
 			},
 			)
@@ -277,7 +299,7 @@ func GetUserData(client mongo.Client, userName, userId string) bson.M {
 	} else {
 		log.Print(err)
 		collection := client.Database("farmsDb").Collection("userFarm")
-		_, err := collection.InsertOne(context.TODO(), bson.D{{"userId", userId}, {"userName", userName}, {"bananas", 0}, {"xp", 0}})
+		_, err := collection.InsertOne(context.TODO(), bson.D{{"userId", userId}, {"userName", userName}, {"bananas", 0}, {"xp", 0}, {"hovna", 0}})
 		if err != nil {
 			log.Print(err)
 
@@ -331,6 +353,29 @@ func addHovno(client mongo.Client, userId string) {
 		log.Print(err)
 	}
 }
+
+func subHovno(client mongo.Client, username, userId string) bool {
+	user := GetUserData(client, username, userId)
+	if user["hovna"] == nil {
+		addField(client, userId, "hovna", 0)
+		return false
+	} else if (int(user["hovna"].(int32))) <= 0 {
+		return false
+	}
+	collection := client.Database("farmsDb").Collection("userFarm")
+	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
+		bson.D{
+			{Key: "$inc", Value: bson.D{{Key: "hovna", Value: -1}}},
+		},
+	)
+
+	if err != nil {
+		log.Print(err)
+	}
+
+	return true
+}
+
 func addMoney(client mongo.Client, userId string, money int) {
 	collection := client.Database("farmsDb").Collection("userFarm")
 	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
@@ -357,7 +402,7 @@ func addField(client mongo.Client, userId, fieldName string, value int) {
 	collection := client.Database("farmsDb").Collection("userFarm")
 	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
 		bson.D{
-			{Key: fieldName, Value: value},
+			{Key: "$set", Value: bson.D{{Key: fieldName, Value: value}}},
 		},
 	)
 	if err != nil {
