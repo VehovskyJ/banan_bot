@@ -76,11 +76,10 @@ func (db *Database) AddHovno(userId string) error {
 
 func (db *Database) SubHovno(username, userId string) (bool, error) {
 	user, _ := db.GetUserData(username, userId)
-	if user["hovna"] == nil {
-		db.addField(userId, "hovna", 0)
-		return false, nil
-	} else if (int(user["hovna"].(int32))) <= 0 {
-		return false, nil
+	hovna, ok := user["hovna"].(int32)
+	if !ok || hovna <= 0 {
+		err := db.addField(userId, "hovna", 0)
+		return false, err
 	}
 
 	collection := db.client.Database("farmsDb").Collection("userFarm")
