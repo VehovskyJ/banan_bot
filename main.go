@@ -3,28 +3,21 @@ package main
 import (
 	"fmt"
 	"log"
-	"math"
-	"math/rand"
 	"os"
 	"os/signal"
 	"padisoft/banana_farmer_bot/database"
-	"strconv"
+	"padisoft/banana_farmer_bot/handlers"
 	"strings"
 	"syscall"
-	"time"
-
 	//"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/go-co-op/gocron"
 )
 
-var token = os.Getenv("DISCORD_TOKEN")
-var scheduler gocron.Scheduler = gocron.Scheduler{}
+// var token = os.Getenv("DISCORD_TOKEN")
+var token = "MTA5MjUzMzMzMjU1MTY4NDIyOA.GS3Sbk.maOBUBFWs0Wu2sqRWGLZFaRNegy9ks5yALGsjE"
 
 func main() {
-	scheduler = *gocron.NewScheduler(time.UTC)
-
 	//Init banana database
 	dbClient, err := database.Connect("mongodb+srv://monkiopicak:JB5NR5RJImwhLxtN@monkidatabse.cxodm.mongodb.net/?retryWrites=true&w=majority")
 
@@ -80,214 +73,28 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate, db *databas
 		return
 	}
 
+	handler := handlers.NewHandler(s, m, db)
+
 	switch strings.ToLower(m.Content) {
 	case "b":
-		_, _ = db.GetUserData(m.Author.Username, m.Author.ID)
-		banans := rand.Intn(16)
-
-		db.AddBananas(m.Author.ID, banans)
-
-		embed := &discordgo.MessageEmbed{
-			Author: &discordgo.MessageEmbedAuthor{},
-			Color:  0x5f119e,
-			Title:  m.Author.Username,
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name:   "Dostal/a jsi: " + strconv.Itoa(int(banans)) + " 🍌",
-					Value:  "🐒Získal/a jsi banány!🐒",
-					Inline: false,
-				},
-			},
-			Footer: &discordgo.MessageEmbedFooter{
-				Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
-			},
-		}
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		handler.MsgB(s, m, db)
 	case "plantaz":
-		user, _ := db.GetUserData(m.Author.Username, m.Author.ID)
-
-		embed := &discordgo.MessageEmbed{
-			Author: &discordgo.MessageEmbedAuthor{},
-			Color:  0x5f119e,
-			Title:  m.Author.Username,
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name:   "Vlastníš: " + strconv.Itoa(int(user["bananas"].(int32))) + " 🍌",
-					Value:  "Miluju opice. 🐒 A taky banány!",
-					Inline: false,
-				},
-			},
-			Footer: &discordgo.MessageEmbedFooter{
-				Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
-			},
-		}
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		handler.MsgPlantaz(s, m, db)
 	case "b money":
-		user, _ := db.GetUserData(m.Author.Username, m.Author.ID)
-		money := 0
-		if user["money"] != nil {
-			money = int(user["money"].(int32))
-		} else {
-			db.AddMoney(m.Author.ID, 0)
-		}
-
-		embed := &discordgo.MessageEmbed{
-			Author: &discordgo.MessageEmbedAuthor{},
-			Color:  0x5f119e,
-			Title:  m.Author.Username,
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name:   "Vlastníš: " + strconv.Itoa(money) + " Opicich dolaru",
-					Value:  "Miluju opice. 🐒 A taky banány!",
-					Inline: false,
-				},
-			},
-			Footer: &discordgo.MessageEmbedFooter{
-				Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
-			},
-		}
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		handler.MsgBMoney(s, m, db)
 	case "b sell":
-		user, _ := db.GetUserData(m.Author.Username, m.Author.ID)
-		bananas := int(user["bananas"].(int32))
-		money := math.Round(float64(bananas / 5))
-		db.ResetBananas(m.Author.ID, bananas)
-		db.AddMoney(m.Author.ID, int(money))
-		embed := &discordgo.MessageEmbed{
-			Author: &discordgo.MessageEmbedAuthor{},
-			Color:  0x5f119e,
-			Title:  m.Author.Username,
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name:   "Prodal/a/o jsi : " + strconv.Itoa(bananas) + "🍌 za " + strconv.Itoa(int(money)) + " Opicich dolaru",
-					Value:  "Miluju opice. 🐒 A taky banány!",
-					Inline: false,
-				},
-			},
-			Footer: &discordgo.MessageEmbedFooter{
-				Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
-			},
-		}
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		handler.MsgBSell(s, m, db)
 	case "b hovno":
-		user, _ := db.GetUserData(m.Author.Username, m.Author.ID)
-		if user["money"] == nil {
-			db.AddMoney(m.Author.ID, 0)
-		}
-		money := int(user["money"].(int32))
-		if money > 100 {
-			db.AddHovno(m.Author.ID)
-			db.AddMoney(m.Author.ID, -100)
-			embed := &discordgo.MessageEmbed{
-				Author: &discordgo.MessageEmbedAuthor{},
-				Color:  0x5f119e,
-				Title:  m.Author.Username,
-				Fields: []*discordgo.MessageEmbedField{
-					{
-						Name:   "Koupil/a/o jsi 1 opici hovno za 100 Opicich dolaru. Pouzij jej prikazem 'hovno @User'",
-						Value:  "Miluju opice. 🐒 A taky banány!",
-						Inline: false,
-					},
-				},
-				Footer: &discordgo.MessageEmbedFooter{
-					Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
-				},
-			}
-			s.ChannelMessageSendEmbed(m.ChannelID, embed)
-		} else {
-			s.ChannelMessageSendReply(m.ChannelID, "Potrebujes aspon 100 opicich dolaru pro koupi opiciho hovna", m.Reference())
-		}
+		handler.MsgBHovno(s, m, db)
 	case "hovno":
-		if len(m.Mentions) == 1 {
-
-			res, _ := db.SubHovno(m.Author.Username, m.Author.ID)
-			if !res {
-				s.ChannelMessageSendReply(m.ChannelID, "Nemas dost hoven :// kup nejake pres b hovno", m.Reference())
-				return
-			}
-			scheduler.Clear()
-
-			if m.Mentions[0].ID == "m.Mentions[0].ID" {
-				s.ChannelMessageSend(m.ChannelID, "⚠️⚠️⚠️⚠️")
-				s.ChannelMessageSend(m.ChannelID, "Za trest budes ohovnen")
-
-				scheduler.Every(10).Seconds().Do(func() {
-					s.ChannelMessageSend(m.ChannelID, "<@"+m.Author.ID+"> byl/a/o jsi proklet opicim prokletim. Hod hovno po nekom dalsim aby jsi se ho zbavil")
-				},
-				)
-				scheduler.StartAsync()
-
-				return
-			}
-
-			s.ChannelMessageSendReply(m.ChannelID, "Hodil/a/o jsi opici hovno po <@"+m.Mentions[0].ID+">", m.Reference())
-
-			scheduler.Every(2).Minutes().Do(func() {
-				s.ChannelMessageSend(m.ChannelID, "<@"+m.Mentions[0].ID+"> byl/a/o jsi proklet opicim prokletim. Hod hovno po nekom dalsim aby jsi se ho zbavil")
-			},
-			)
-			scheduler.StartAsync()
-
-		}
+		handler.MsgHovno(s, m, db)
 	case "b top":
-		topUsers, _ := db.GetTopUsers()
-
-		var fields []*discordgo.MessageEmbedField
-		//decodes the monkeys
-		for i, monke := range topUsers {
-			field := discordgo.MessageEmbedField{
-				Name:   strconv.Itoa(i+1) + ". " + monke["userName"].(string),
-				Value:  "Banánů: " + strconv.Itoa(int(monke["bananas"].(int32))),
-				Inline: false,
-			}
-			fields = append(fields, &field)
-		}
-		embed := &discordgo.MessageEmbed{
-			Author: &discordgo.MessageEmbedAuthor{},
-			Color:  0xfcba03, // Green
-			Title:  "🐒** Nejlepší opičáci: **🐒",
-			Fields: fields,
-			Footer: &discordgo.MessageEmbedFooter{
-				Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
-			},
-		}
-
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		handler.MsgBTop(s, m, db)
 	case "get nerded":
-		if len(m.Mentions) == 1 {
-			nerdedMessagesCount := 0
-			nerdedMessagesTBD := 15
-			messages, _ := s.ChannelMessages(m.ChannelID, 100, "", "", "")
-			for _, message := range messages {
-				if message.Author.ID == m.Mentions[0].ID {
-					s.MessageReactionAdd(message.ChannelID, message.ID, "🤓")
-					nerdedMessagesCount++
-					nerdedMessagesTBD--
-					if nerdedMessagesTBD == 0 {
-						break
-					}
-				}
-			}
-
-		}
+		handler.MsgGetNerded(s, m)
 	case "get jinxed":
-		if len(m.Mentions) == 1 {
-			nerdedMessagesCount := 0
-			nerdedMessagesTBD := 15
-			messages, _ := s.ChannelMessages(m.ChannelID, 100, "", "", "")
-			for _, message := range messages {
-				if message.Author.ID == m.Mentions[0].ID {
-					s.MessageReactionAdd(message.ChannelID, message.ID, "jinx1:1074460008307245067")
-					nerdedMessagesCount++
-					nerdedMessagesTBD--
-					if nerdedMessagesTBD == 0 {
-						break
-					}
-				}
-			}
-
-		}
+		handler.MsgGetJinxed(s, m)
 	case "opice hovno":
-		s.ChannelMessageSendReply(m.ChannelID, "ZIJU TI VE ZDECH ZIJU TI VE ZDECH", m.Reference())
+		handler.MsgOpiceHovno(s, m)
 	}
 }
