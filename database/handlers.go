@@ -24,11 +24,10 @@ func (db *Database) GetUserData(userName, userId string) (bson.M, error) {
 
 func (db *Database) GetTopUsers() ([]bson.M, error) {
 	collection := db.client.Database("farmsDb").Collection("userFarm")
-	findOptions := options.Find()
-
 	// Sort by `price` field descending
-	findOptions.SetSort(bson.D{{"bananas", -1}})
-	findOptions.SetLimit(10)
+	findOptions := options.Find().
+		SetSort(bson.D{{"bananas", -1}}).
+		SetLimit(10)
 
 	//Does the query
 	documents, err := collection.Find(context.TODO(), bson.D{}, findOptions)
@@ -36,7 +35,6 @@ func (db *Database) GetTopUsers() ([]bson.M, error) {
 		return nil, err
 	}
 
-	//decodes the querry
 	var monkeys []bson.M
 	err = documents.All(context.TODO(), &monkeys)
 
