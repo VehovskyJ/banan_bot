@@ -1,13 +1,13 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"os"
 	"os/signal"
+	"padisoft/banana_farmer_bot/database"
 	"strconv"
 	"strings"
 	"syscall"
@@ -17,11 +17,6 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/go-co-op/gocron"
-	"go.mongodb.org/mongo-driver/bson"
-
-	//"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var token = os.Getenv("DISCORD_TOKEN")
@@ -32,7 +27,7 @@ func main() {
 	scheduler = *gocron.NewScheduler(time.UTC)
 
 	//Init banana database
-	dbClient = initDatabase()
+	dbClient, err := database.Connect("mongodb+srv://monkiopicak:JB5NR5RJImwhLxtN@monkidatabse.cxodm.mongodb.net/?retryWrites=true&w=majority")
 
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + token)
@@ -44,7 +39,9 @@ func main() {
 	dg.AddHandler(ready)
 
 	// Register messageCreate as a callback for the messageCreate events.
-	dg.AddHandler(messageCreate)
+	dg.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
+		messageCreate(s, m, dbClient)
+	})
 
 	// We need information about guilds (which includes their channels),
 	// messages and voice states.
@@ -79,7 +76,7 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the authenticated bot has access to.
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate, db *database.Database) {
 	if m.Author.Bot {
 		return
 	}
