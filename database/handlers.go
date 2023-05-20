@@ -41,11 +41,22 @@ func (db *Database) GetTopUsers() ([]bson.M, error) {
 	return monkeys, err
 }
 
-func (db *Database) AddBanans(userId string, banans int) error {
+func (db *Database) AddBananas(userId string, banans int) error {
 	collection := db.client.Database("farmsDb").Collection("userFarm")
 	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
 		bson.D{
 			{Key: "$inc", Value: bson.D{{Key: "bananas", Value: banans}}},
+		},
+	)
+
+	return err
+}
+
+func (db *Database) ResetBananas(userId string, bananas int) error {
+	collection := db.client.Database("farmsDb").Collection("userFarm")
+	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
+		bson.D{
+			{Key: "$inc", Value: bson.D{{Key: "bananas", Value: -bananas}}},
 		},
 	)
 
@@ -87,17 +98,6 @@ func (db *Database) AddMoney(userId string, money int) error {
 	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
 		bson.D{
 			{Key: "$inc", Value: bson.D{{Key: "money", Value: money}}},
-		},
-	)
-
-	return err
-}
-
-func (db *Database) ResetBananas(userId string, bananas int) error {
-	collection := db.client.Database("farmsDb").Collection("userFarm")
-	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
-		bson.D{
-			{Key: "$inc", Value: bson.D{{Key: "bananas", Value: -bananas}}},
 		},
 	)
 

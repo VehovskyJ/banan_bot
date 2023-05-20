@@ -20,7 +20,6 @@ import (
 )
 
 var token = os.Getenv("DISCORD_TOKEN")
-var dbClient *mongo.Client
 var scheduler gocron.Scheduler = gocron.Scheduler{}
 
 func main() {
@@ -86,7 +85,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate, db *databas
 		_, _ = db.GetUserData(m.Author.Username, m.Author.ID)
 		banans := rand.Intn(16)
 
-		db.AddBanans(m.Author.ID, banans)
+		db.AddBananas(m.Author.ID, banans)
 
 		embed := &discordgo.MessageEmbed{
 			Author: &discordgo.MessageEmbedAuthor{},
