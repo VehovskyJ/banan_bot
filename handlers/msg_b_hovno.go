@@ -5,32 +5,39 @@ import (
 	"padisoft/banana_farmer_bot/database"
 )
 
-func (h *Handler) MsgBHovno(s *discordgo.Session, m *discordgo.MessageCreate, db *database.Database) {
-	user, _ := db.GetUserData(m.Author.Username, m.Author.ID)
-	if user["money"] == nil {
-		db.AddMoney(m.Author.ID, 0)
+func (h *Handler) MsgBHovno(s *discordgo.Session, m *discordgo.MessageCreate, db *database.Database) error {
+	user, err := db.GetUserData(m.Author.Username, m.Author.ID)
+	if err != nil {
+		return err
 	}
+
+	if user["money"] == nil {
+		err := db.AddMoney(m.Author.ID, 0)
+		if err != nil {
+			return err
+		}
+	}
+
 	money := int(user["money"].(int32))
 	if money > 100 {
-		db.AddHovno(m.Author.ID)
-		db.AddMoney(m.Author.ID, -100)
-		embed := &discordgo.MessageEmbed{
-			Author: &discordgo.MessageEmbedAuthor{},
-			Color:  0x5f119e,
-			Title:  m.Author.Username,
-			Fields: []*discordgo.MessageEmbedField{
-				{
-					Name:   "Koupil/a/o jsi 1 opici hovno za 100 Opicich dolaru. Pouzij jej prikazem 'hovno @User'",
-					Value:  "Miluju opice. 🐒 A taky banány!",
-					Inline: false,
-				},
-			},
-			Footer: &discordgo.MessageEmbedFooter{
-				Text: "Credits: @Matyslav_  ||  Přispěj na vývoj opičáka na patreon.com/Padisoft 🐒",
-			},
+		err := db.AddHovno(m.Author.ID)
+		if err != nil {
+			return err
 		}
-		s.ChannelMessageSendEmbed(m.ChannelID, embed)
-	} else {
-		s.ChannelMessageSendReply(m.ChannelID, "Potrebujes aspon 100 opicich dolaru pro koupi opiciho hovna", m.Reference())
+
+		err = db.AddMoney(m.Author.ID, -100)
+		if err != nil {
+			return err
+		}
+
+		embed := embedPurple(m.Author.Username, "Koupil/a/o jsi 1 opici hovno za 100 Opicich dolaru. Pouzij jej prikazem 'hovno @User'", "Miluju opice. 🐒 A taky banány!")
+
+		_, err = s.ChannelMessageSendEmbed(m.ChannelID, embed)
+
+		return err
 	}
+
+	_, err = s.ChannelMessageSendReply(m.ChannelID, "Potrebujes aspon 100 opicich dolaru pro koupi opiciho hovna", m.Reference())
+
+	return err
 }
