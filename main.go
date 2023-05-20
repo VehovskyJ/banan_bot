@@ -1,13 +1,13 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"math"
 	"math/rand"
 	"os"
 	"os/signal"
+	"padisoft/banana_farmer_bot/database"
 	"strconv"
 	"strings"
 	"syscall"
@@ -17,22 +17,16 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/go-co-op/gocron"
-	"go.mongodb.org/mongo-driver/bson"
-
-	//"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var token = os.Getenv("DISCORD_TOKEN")
-var dbClient *mongo.Client
 var scheduler gocron.Scheduler = gocron.Scheduler{}
 
 func main() {
 	scheduler = *gocron.NewScheduler(time.UTC)
 
 	//Init banana database
-	dbClient = initDatabase()
+	dbClient, err := database.Connect("mongodb+srv://monkiopicak:JB5NR5RJImwhLxtN@monkidatabse.cxodm.mongodb.net/?retryWrites=true&w=majority")
 
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + token)
@@ -44,7 +38,9 @@ func main() {
 	dg.AddHandler(ready)
 
 	// Register messageCreate as a callback for the messageCreate events.
-	dg.AddHandler(messageCreate)
+	dg.AddHandler(func(s *discordgo.Session, m *discordgo.MessageCreate) {
+		messageCreate(s, m, dbClient)
+	})
 
 	// We need information about guilds (which includes their channels),
 	// messages and voice states.
@@ -79,17 +75,17 @@ func ready(s *discordgo.Session, event *discordgo.Ready) {
 
 // This function will be called (due to AddHandler above) every time a new
 // message is created on any channel that the authenticated bot has access to.
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate, db *database.Database) {
 	if m.Author.Bot {
 		return
 	}
 
 	switch strings.ToLower(m.Content) {
 	case "b":
-		_, _ = GetUserData(dbClient, m.Author.Username, m.Author.ID)
+		_, _ = db.GetUserData(m.Author.Username, m.Author.ID)
 		banans := rand.Intn(16)
 
-		addBanans(dbClient, m.Author.ID, banans)
+		db.AddBananas(m.Author.ID, banans)
 
 		embed := &discordgo.MessageEmbed{
 			Author: &discordgo.MessageEmbedAuthor{},
@@ -108,7 +104,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	case "plantaz":
-		user, _ := GetUserData(dbClient, m.Author.Username, m.Author.ID)
+		user, _ := db.GetUserData(m.Author.Username, m.Author.ID)
 
 		embed := &discordgo.MessageEmbed{
 			Author: &discordgo.MessageEmbedAuthor{},
@@ -127,12 +123,12 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	case "b money":
-		user, _ := GetUserData(dbClient, m.Author.Username, m.Author.ID)
+		user, _ := db.GetUserData(m.Author.Username, m.Author.ID)
 		money := 0
 		if user["money"] != nil {
 			money = int(user["money"].(int32))
 		} else {
-			addMoney(dbClient, m.Author.ID, 0)
+			db.AddMoney(m.Author.ID, 0)
 		}
 
 		embed := &discordgo.MessageEmbed{
@@ -152,11 +148,11 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	case "b sell":
-		user, _ := GetUserData(dbClient, m.Author.Username, m.Author.ID)
+		user, _ := db.GetUserData(m.Author.Username, m.Author.ID)
 		bananas := int(user["bananas"].(int32))
 		money := math.Round(float64(bananas / 5))
-		resetBananas(dbClient, m.Author.ID, bananas)
-		addMoney(dbClient, m.Author.ID, int(money))
+		db.ResetBananas(m.Author.ID, bananas)
+		db.AddMoney(m.Author.ID, int(money))
 		embed := &discordgo.MessageEmbed{
 			Author: &discordgo.MessageEmbedAuthor{},
 			Color:  0x5f119e,
@@ -174,14 +170,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 		}
 		s.ChannelMessageSendEmbed(m.ChannelID, embed)
 	case "b hovno":
-		user, _ := GetUserData(dbClient, m.Author.Username, m.Author.ID)
+		user, _ := db.GetUserData(m.Author.Username, m.Author.ID)
 		if user["money"] == nil {
-			addMoney(dbClient, m.Author.ID, 0)
+			db.AddMoney(m.Author.ID, 0)
 		}
 		money := int(user["money"].(int32))
 		if money > 100 {
-			addHovno(dbClient, m.Author.ID)
-			addMoney(dbClient, m.Author.ID, -100)
+			db.AddHovno(m.Author.ID)
+			db.AddMoney(m.Author.ID, -100)
 			embed := &discordgo.MessageEmbed{
 				Author: &discordgo.MessageEmbedAuthor{},
 				Color:  0x5f119e,
@@ -204,7 +200,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	case "hovno":
 		if len(m.Mentions) == 1 {
 
-			res, _ := subHovno(dbClient, m.Author.Username, m.Author.ID)
+			res, _ := db.SubHovno(m.Author.Username, m.Author.ID)
 			if !res {
 				s.ChannelMessageSendReply(m.ChannelID, "Nemas dost hoven :// kup nejake pres b hovno", m.Reference())
 				return
@@ -234,7 +230,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		}
 	case "b top":
-		topUsers, _ := GetTopUsers(dbClient)
+		topUsers, _ := db.GetTopUsers()
 
 		var fields []*discordgo.MessageEmbedField
 		//decodes the monkeys
@@ -294,123 +290,4 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 	case "opice hovno":
 		s.ChannelMessageSendReply(m.ChannelID, "ZIJU TI VE ZDECH ZIJU TI VE ZDECH", m.Reference())
 	}
-}
-
-func initDatabase() *mongo.Client {
-	//MongoDB database connection
-	serverAPIOptions := options.ServerAPI(options.ServerAPIVersion1)
-	clientOptions := options.Client().
-		ApplyURI("mongodb+srv://monkiopicak:JB5NR5RJImwhLxtN@monkidatabse.cxodm.mongodb.net/?retryWrites=true&w=majority").
-		SetServerAPIOptions(serverAPIOptions)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	client, err := mongo.Connect(ctx, clientOptions)
-	if err != nil {
-		log.Fatalf("Failed to connect to the database: %s", err)
-	}
-
-	return client
-}
-
-func GetUserData(client *mongo.Client, userName, userId string) (bson.M, error) {
-	collection := client.Database("farmsDb").Collection("userFarm")
-	var opicak bson.M
-	err := collection.FindOne(context.TODO(), bson.M{"userId": userId}).Decode(&opicak)
-
-	return opicak, err
-}
-
-func GetTopUsers(client *mongo.Client) ([]bson.M, error) {
-	collection := client.Database("farmsDb").Collection("userFarm")
-	findOptions := options.Find()
-
-	// Sort by `price` field descending
-	findOptions.SetSort(bson.D{{"bananas", -1}})
-	findOptions.SetLimit(10)
-
-	//Does the query
-	documents, err := collection.Find(context.TODO(), bson.D{}, findOptions)
-	if err != nil {
-		return nil, err
-	}
-
-	//decodes the querry
-	var monkeys []bson.M
-	err = documents.All(context.TODO(), &monkeys)
-
-	return monkeys, err
-}
-
-func addBanans(client *mongo.Client, userId string, banans int) error {
-	collection := client.Database("farmsDb").Collection("userFarm")
-	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
-		bson.D{
-			{Key: "$inc", Value: bson.D{{Key: "bananas", Value: banans}}},
-		},
-	)
-
-	return err
-}
-
-func addHovno(client *mongo.Client, userId string) error {
-	collection := client.Database("farmsDb").Collection("userFarm")
-	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
-		bson.D{
-			{Key: "$inc", Value: bson.D{{Key: "hovna", Value: 1}}},
-		},
-	)
-
-	return err
-}
-
-func subHovno(client *mongo.Client, username, userId string) (bool, error) {
-	user, _ := GetUserData(client, username, userId)
-	if user["hovna"] == nil {
-		addField(client, userId, "hovna", 0)
-		return false, nil
-	} else if (int(user["hovna"].(int32))) <= 0 {
-		return false, nil
-	}
-
-	collection := client.Database("farmsDb").Collection("userFarm")
-	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
-		bson.D{
-			{Key: "$inc", Value: bson.D{{Key: "hovna", Value: -1}}},
-		},
-	)
-
-	return true, err
-}
-
-func addMoney(client *mongo.Client, userId string, money int) error {
-	collection := client.Database("farmsDb").Collection("userFarm")
-	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
-		bson.D{
-			{Key: "$inc", Value: bson.D{{Key: "money", Value: money}}},
-		},
-	)
-
-	return err
-}
-
-func resetBananas(client *mongo.Client, userId string, bananas int) error {
-	collection := client.Database("farmsDb").Collection("userFarm")
-	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
-		bson.D{
-			{Key: "$inc", Value: bson.D{{Key: "bananas", Value: -bananas}}},
-		},
-	)
-
-	return err
-}
-
-func addField(client *mongo.Client, userId, fieldName string, value int) error {
-	collection := client.Database("farmsDb").Collection("userFarm")
-	_, err := collection.UpdateOne(context.TODO(), bson.M{"userId": userId},
-		bson.D{
-			{Key: "$set", Value: bson.D{{Key: fieldName, Value: value}}},
-		},
-	)
-
-	return err
 }
