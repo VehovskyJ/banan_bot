@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"log"
 	"math"
@@ -25,11 +24,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func init() {
-	//flag.StringVar(&token, "t", "", "Bot Token")
-	flag.Parse()
-}
-
 var token = os.Getenv("DISCORD_TOKEN")
 var dbClient mongo.Client = mongo.Client{}
 var scheduler gocron.Scheduler = gocron.Scheduler{}
@@ -43,8 +37,7 @@ func main() {
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
-		fmt.Println("Error creating Discord session: ", err)
-		return
+		log.Fatalf("Error creating Discord session: %s", err)
 	}
 
 	// Register ready as a callback for the ready events.
@@ -60,7 +53,7 @@ func main() {
 	// Open the websocket and begin listening.
 	err = dg.Open()
 	if err != nil {
-		fmt.Println("Error opening Discord session: ", err)
+		log.Fatalf("Error opening Discord session: %s", err)
 	}
 
 	// Wait here until CTRL-C or other term signal is received.
