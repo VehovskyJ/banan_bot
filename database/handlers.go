@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -12,7 +13,7 @@ func (db *Database) GetUserData(userName, userId string) (bson.M, error) {
 	collection := db.client.Database("farmsDb").Collection("userFarm")
 	var opicak bson.M
 	err := collection.FindOne(context.TODO(), bson.M{"userId": userId}).Decode(&opicak)
-	if err == mongo.ErrNoDocuments {
+	if errors.Is(err, mongo.ErrNoDocuments) {
 		//No user found, creates new one
 		_, err = collection.InsertOne(context.TODO(), bson.D{{"userId", userId}, {"userName", userName}, {"bananas", 0}, {"xp", 0}, {"hovna", 0}})
 	} else if err != nil {
