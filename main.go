@@ -14,12 +14,12 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// var token = os.Getenv("DISCORD_TOKEN")
-var token = "MTA5MjUzMzMzMjU1MTY4NDIyOA.GS3Sbk.maOBUBFWs0Wu2sqRWGLZFaRNegy9ks5yALGsjE"
+var token = os.Getenv("DISCORD_TOKEN")
+var mongo = os.Getenv("MONGO_URI")
 
 func main() {
 	//Init banana database
-	dbClient, err := database.Connect("mongodb+srv://monkiopicak:JB5NR5RJImwhLxtN@monkidatabse.cxodm.mongodb.net/?retryWrites=true&w=majority")
+	dbClient, err := database.Connect(mongo)
 
 	// Create a new Discord session using the provided bot token.
 	dg, err := discordgo.New("Bot " + token)
