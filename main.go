@@ -75,26 +75,31 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate, db *databas
 
 	handler := handlers.NewHandler(s, m, db)
 
+	var err error
 	switch strings.ToLower(m.Content) {
 	case "b":
-		handler.MsgB(s, m, db)
+		err = handler.MsgB(s, m, db)
 	case "plantaz":
-		handler.MsgPlantaz(s, m, db)
+		err = handler.MsgPlantaz(s, m, db)
 	case "b money":
-		handler.MsgBMoney(s, m, db)
+		err = handler.MsgBMoney(s, m, db)
 	case "b sell":
-		handler.MsgBSell(s, m, db)
+		err = handler.MsgBSell(s, m, db)
 	case "b hovno":
-		handler.MsgBHovno(s, m, db)
+		err = handler.MsgBHovno(s, m, db)
 	case "hovno":
 		handler.MsgHovno(s, m, db)
 	case "b top":
-		handler.MsgBTop(s, m, db)
+		err = handler.MsgBTop(s, m, db)
 	case "get nerded":
 		handler.MsgGetNerded(s, m)
 	case "get jinxed":
 		handler.MsgGetJinxed(s, m)
 	case "opice hovno":
-		handler.MsgOpiceHovno(s, m)
+		err = handler.MsgOpiceHovno(s, m)
+	}
+
+	if err != nil {
+		log.Printf("Failed to handle %s with error: %s", m.Content, err)
 	}
 }
