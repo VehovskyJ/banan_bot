@@ -57,7 +57,7 @@ func main() {
 
 // This function will be called (due to AddHandler above) when the bot receives
 // the "ready" event from Discord.
-func ready(s *discordgo.Session, event *discordgo.Ready) {
+func ready(s *discordgo.Session) {
 	// Set the playing status.
 	//s.UpdateGameStatus(0, "Krsipina smrdi jak tvoje mamka lool opice")
 	err := s.UpdateGameStatus(0, "epicka bananova plantáž")
